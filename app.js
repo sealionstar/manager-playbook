@@ -86,6 +86,11 @@
     }
     return req.then(function (r) { return r.json(); }).then(function (j) {
       if (!j || j.ok === false) throw new Error((j && j.error) || 'เกิดข้อผิดพลาด');
+      // เดือนที่ประเมิน: Google Sheet อาจแปลง "2026-11" เป็นวันที่ → แปลงกลับเป็น ปี-เดือน
+      if (j.evals) j.evals.forEach(function (e) {
+        var v = String(e.period || '');
+        if (v && !/^\d{4}-\d{2}$/.test(v)) { var d = new Date(v); if (!isNaN(d)) e.period = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+      });
       return j;
     });
   }
@@ -261,7 +266,7 @@
         '<div class="row between" style="margin:18px 4px 8px"><h2 class="h2">ประวัติการประเมิน</h2><span class="small muted">' + list.length + ' ครั้ง</span></div>' +
         '<div class="list">' + list.map(function (x) {
           return '<a href="#/audit/' + esc(x.audit_id) + '"><span style="flex:1;min-width:0"><span style="display:block;font-weight:600">' + fmtDate(x.saved_at) + '</span>' +
-            '<span class="small muted ellipsis" style="display:block">โดย ' + esc(x.auditor_name) + (x.staff_name ? ' · Staff: ' + esc(x.staff_name) : '') + '</span></span>' +
+            '<span class="small muted ellipsis" style="display:block">โดย ASM' + (x.staff_name ? ' · Staff: ' + esc(x.staff_name) : '') + '</span></span>' +
             '<span class="score ' + pctColor(x.total_pct) + '">' + x.total_pct + '%</span></a>';
         }).join('') + '</div>';
       store('mp_audits_' + b.code, list);
@@ -291,7 +296,7 @@
       var ans = {}; try { ans = JSON.parse(a.answers_json || '{}'); } catch (e) {}
       var html = '<div class="card dark"><div class="small muted">สาขา ' + esc(a.branch_code) + ' · ' + esc(a.branch_name) + '</div>' +
         '<div style="font-size:36px;font-weight:700;color:' + (Number(a.total_pct) >= PASS_LINE ? '#8FB2FF' : '#FF9B5C') + '">' + a.total_pct + '%</div>' +
-        '<div class="small muted">' + fmtDate(a.audit_time || a.saved_at) + ' · โดย ' + esc(a.auditor_name) + '</div>' + sectionBars(a, true) + '</div>';
+        '<div class="small muted">' + fmtDate(a.audit_time || a.saved_at) + ' · โดย ASM</div>' + sectionBars(a, true) + '</div>';
       SECTIONS.forEach(function (s) {
         html += '<div class="row between" style="margin:18px 4px 8px"><h2 class="h2">' + s.name + '</h2>' +
           (s.id === 'staff' && a.staff_name ? '<span class="small muted">' + esc(a.staff_name) + ' · ' + esc(a.staff_position) + '</span>' : '') + '</div>';
@@ -1282,7 +1287,7 @@
       var html = '<div class="card dark"><div class="small muted">สาขา ' + esc(e.branch_code) + ' · ' + esc(e.branch_name) + '</div>' +
         '<div style="font-size:18px;font-weight:700;margin-top:2px">' + esc(e.bm_name) + ' <span class="small muted">· ' + esc(e.bm_position) + '</span></div>' +
         '<div class="row" style="align-items:baseline;gap:12px"><span style="font-size:44px;font-weight:700;color:' + (Number(e.total_score) >= 80 ? '#8FB2FF' : '#FF9B5C') + '">' + e.total_score + '</span><span style="font-size:20px;font-weight:700">เกรด ' + esc(e.grade) + '</span></div>' +
-        '<div class="small muted">' + esc(monthLabel(e.period)) + ' · ' + fmtDate(e.saved_at) + ' · โดย ' + esc(e.auditor_name) + '</div>' +
+        '<div class="small muted">' + esc(monthLabel(e.period)) + ' · ' + fmtDate(e.saved_at) + ' · โดย ASM</div>' +
         '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">' +
         [{ name: 'A · อัตโนมัติ', pts: Number(e.auto_score), w: 35 }].concat((C.bmEvalSections || []).map(function (s) { var x = sec[s.id] || {}; return { name: s.name, pts: x.pts || 0, w: s.w }; })).map(function (s) {
           return '<div class="row"><span class="small ellipsis" style="width:42%">' + esc(s.name) + '</span>' + bar(Math.round(s.pts / s.w * 100), true) + '<span class="small" style="width:60px;text-align:right;font-weight:700">' + s.pts + '/' + s.w + '</span></div>';
