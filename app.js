@@ -97,6 +97,26 @@
 
   /* ---------------- session / routing ---------------- */
   function user() { return store('mp_user'); }
+  // BM ที่ดูแลหลายสาขา: แถบเลือกสาขา (เปลี่ยนแล้วทุกหน้ากรองพนักงานตามสาขาที่เลือก)
+  function branchBar() {
+    var u = user();
+    if (!u || u.role === 'ASM' || !u.branches || u.branches.length < 2) return '';
+    var h = location.hash.replace(/^#\/?/, '');
+    if (h && h.indexOf('bm/') !== 0) return ''; // แสดงเฉพาะหน้าแรกและหน้าเครื่องมือ BM
+    return '<div class="branch-bar"><span class="small muted">สาขาที่ดูแล</span><div class="seg">' + u.branches.map(function (c) {
+      var b = branch(c);
+      return '<button class="choice' + (c === String(u.branch) ? ' on' : '') + '" data-switch="' + esc(c) + '" aria-pressed="' + (c === String(u.branch)) + '"><b>' + esc(c) + '</b> <span class="tiny" style="opacity:.75">' + esc(b ? b.name.replace(/^Studio ?7-?/, '') : '') + '</span></button>';
+    }).join('') + '</div></div>';
+  }
+  function wireBranchBar() {
+    app.querySelectorAll('[data-switch]').forEach(function (el) {
+      el.onclick = function () {
+        var u = user(), c = el.getAttribute('data-switch'); if (c === String(u.branch)) return;
+        var b = branch(c); u.branch = c; u.branchName = b ? b.name : ''; store('mp_user', u);
+        toast('เปลี่ยนเป็นสาขา ' + c); render();
+      };
+    });
+  }
   function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
   window.addEventListener('hashchange', render);
 
@@ -187,11 +207,12 @@
     return '<div class="top">' +
       (back ? '<button class="icon-btn back" data-back aria-label="ย้อนกลับ">' + ICON.back + '</button>' : '') +
       '<div class="grow"><div class="eyebrow ellipsis">' + esc(eyebrow) + '</div><h1 class="h1">' + esc(title) + '</h1></div>' +
-      (back ? '' : '<button class="icon-btn" data-logout aria-label="ออกจากระบบ">' + ICON.out + '</button>') + '</div>';
+      (back ? '' : '<button class="icon-btn" data-logout aria-label="ออกจากระบบ">' + ICON.out + '</button>') + '</div>' + branchBar();
   }
   function wireHeader() {
     var b = app.querySelector('[data-back]'); if (b) b.onclick = function () { history.length > 1 ? history.back() : go('#/'); };
     var l = app.querySelector('[data-logout]'); if (l) l.onclick = logout;
+    wireBranchBar();
   }
   function loading(msg) { return '<div class="center"><div class="spinner"></div>' + esc(msg || 'กำลังโหลด…') + '</div>'; }
 

@@ -230,3 +230,7 @@ a.card.stat { color: var(--text); display: block; margin: 0; }
 .hrow:first-child { border-top: 0; }
 details > summary { list-style: none; } details > summary::-webkit-details-marker { display: none; }
 details > summary::before { content: '▸ '; } details[open] > summary::before { content: '▾ '; }
+
+/* v3.4 · multi-branch BM */
+.branch-bar { margin: -4px 0 14px; display: flex; flex-direction: column; gap: 6px; }
+.branch-bar .choice { min-height: 44px; padding: 4px 14px; text-align: left; }
