@@ -118,7 +118,13 @@
     if (parts[0] === 'bmeval' && parts[1] === 'new' && u.role === 'ASM') return viewBmEvalForm();
     if (parts[0] === 'bmeval' && parts[1]) return viewBmEvalDetail(parts[1]);
     if (parts[0] === 'bmeval' && u.role === 'ASM') return viewBmEvalList();
+    if (parts[0] === 'history') return viewHistory(u.role === 'ASM' ? parts[1] : u.branch);
+    if (parts[0] === 'am' && u.role === 'ASM') {
+      if (parts[1] === 'roleplay') return viewBmRoleplay();
+      if (parts[1] === 'score' && parts[2]) return viewBmScore(parts[3], parts[2]);
+    }
     if (parts[0] === 'bm' && u.role !== 'ASM') {
+      if (parts[1] === 'history') return viewHistory(u.branch);
       if (parts[1] === 'score') return viewBmScore(parts[2]);
       if (parts[1] === 'demo') return viewBmDemo();
       if (parts[1] === 'roleplay') return viewBmRoleplay();
@@ -195,6 +201,7 @@
     app.innerHTML = '<div class="wrap">' + header('ASM · ' + u.branchName, 'สวัสดี คุณ' + u.name.split(' ')[0]) +
       '<div class="grid2"><button class="btn" id="start">เริ่มประเมินหน้าร้าน</button><a class="btn ghost" href="#/results">ผลประเมินหน้าร้าน</a></div>' +
       '<div class="grid2" style="margin-top:10px"><a class="btn dark" href="#/bmeval/new">ประเมิน BM</a><a class="btn ghost" href="#/bmeval">ผลประเมิน BM</a></div>' +
+      '<a class="btn ghost" href="#/am/roleplay" style="margin-top:10px">Role-play เช็กพนักงานหน้าร้าน</a>' +
       '<div id="body" style="margin-top:14px">' + loading() + '</div></div>';
     wireHeader();
     $('#start').onclick = function () { go('#/audit/new'); };
@@ -469,7 +476,7 @@
   }
   function saveLog(log) {
     var u = user();
-    log.bmId = u.id; log.bmName = u.name; log.branch = log.branch || u.branch;
+    log.bmId = u.id; log.bmName = u.role === 'ASM' ? 'ASM' : u.name; log.branch = log.branch || u.branch;
     return api({ action: 'saveLog', log: log }, true);
   }
 
@@ -526,7 +533,7 @@
       BRANCHES.forEach(function (b) { act[b.code] = { score: [], spotBills: 0, spotOk: 0, spotN: 0, demo: 0 }; });
       logs.forEach(function (l) {
         var a = act[l.branch_code]; if (!a) return;
-        if (l.type === 'score') a.score.push(l);
+        if (l.type === 'score' && l.bm_name !== 'ASM') a.score.push(l);
         if (l.type === 'spot') { a.spotBills++; a.spotOk += Number(l.score) || 0; a.spotN += Number(l.max_score) || 0; }
         if (l.type === 'demo' && Number(l.pct) === 100) a.demo++;
       });
@@ -587,8 +594,8 @@
     api({ action: 'logs', branch: code, limit: 300 }).then(function (j) {
       var mk = monthKey(new Date());
       var logs = (j.logs || []).filter(function (l) { return monthKey(l.saved_at) === mk; });
-      var sc = logs.filter(function (l) { return l.type === 'score'; }), dm = logs.filter(function (l) { return l.type === 'demo'; });
-      el.innerHTML = '<div class="card"><div class="row between"><h2 class="h2">กิจกรรมโค้ชของ BM เดือนนี้</h2></div>' +
+      var sc = logs.filter(function (l) { return l.type === 'score' && l.bm_name !== 'ASM'; }), dm = logs.filter(function (l) { return l.type === 'demo'; });
+      el.innerHTML = '<div class="card"><div class="row between"><h2 class="h2">กิจกรรมโค้ชของ BM เดือนนี้</h2><a class="small" href="#/history/' + code + '">ประวัติการฝึกรายคน ›</a></div>' +
         '<div class="grid3" style="margin-top:10px">' +
         '<div class="stat"><div class="label">ประเมินพนักงาน</div><div class="value" style="font-size:20px">' + sc.length + ' <span class="small muted">ครั้ง · ' + pctTxt(avgOf(sc.map(function (l) { return l.pct; }))) + '</span></div></div>' +
         '<div class="stat"><div class="label">Role-play</div><div class="value" style="font-size:20px">' + sc.filter(function (l) { return /^Role-play/.test(l.topic || ''); }).length + ' <span class="small muted">ครั้ง</span></div></div>' +
@@ -608,7 +615,8 @@
   var BM_TOOLS = [
     ['score', 'ประเมินพนักงาน', '10 ข้อ · หลังสังเกตการขายจริง'],
     ['demo', 'Demo Product', 'เฉพาะ PIA · Mac iPad Pencil Watch'],
-    ['roleplay', 'Role-play', 'สุ่มโจทย์ตามอุปกรณ์ · จับเวลา 5 นาที'],
+    ['roleplay', 'Role-play', 'สุ่มโจทย์ตามอุปกรณ์ · จับเวลา 10 นาที'],
+    ['history', 'ประวัติการฝึกทีม', 'ใครฝึกเรื่องอะไรไปแล้วบ้าง'],
     ['objection', 'การ์ดข้อโต้แย้ง', 'ฝึกตอบใน 1 ประโยค'],
     ['democards', 'การ์ดคำถาม Demo', 'คำถามลูกค้าระหว่าง Demo']
   ];
@@ -639,7 +647,7 @@
     Promise.all([loadTeam(b.code), api({ action: 'logs', branch: b.code, limit: 500 })]).then(function (r) {
       var team = r[0], logs = r[1].logs || [], mk = monthKey(new Date());
       var month = logs.filter(function (l) { return monthKey(l.saved_at) === mk; });
-      var scored = {}; month.filter(function (l) { return l.type === 'score'; }).forEach(function (l) { if (!scored[l.staff_id]) scored[l.staff_id] = l; });
+      var scored = {}; month.filter(function (l) { return l.type === 'score' && l.bm_name !== 'ASM'; }).forEach(function (l) { if (!scored[l.staff_id]) scored[l.staff_id] = l; });
       var pia = team.filter(function (m) { return m.position === 'PIA'; });
       var dm = demoMatrix(logs, pia);
       var full = pia.filter(function (m) { return dm[m.id].filter(Boolean).length === C.demoDevices.length; }).length;
@@ -655,13 +663,13 @@
   }
 
   /* ---------------- BM · ประเมินพนักงาน 10 ข้อ ---------------- */
-  function viewBmScore(preId) {
-    var u = user(), items = C.scoreItems || [];
+  function viewBmScore(preId, branchCode) {
+    var u = user(), items = C.scoreItems || [], code = branchCode || u.branch, isAm = u.role === 'ASM';
     var rp = store('mp_rp'); store('mp_rp', null);
     var st = { team: null, staffId: preId || (rp && rp.staffId) || '', marks: {}, note: '', topic: rp ? 'Role-play · ' + rp.who : '', saving: false, hist: [] };
-    app.innerHTML = '<div class="wrap">' + header('สาขา ' + u.branch + ' · ' + u.name, 'ประเมินพนักงาน', true) + '<div id="body">' + loading() + '</div></div>';
+    app.innerHTML = '<div class="wrap">' + header('สาขา ' + code + ' · ' + (isAm ? 'ASM' : u.name), 'ประเมินพนักงาน', true) + '<div id="body">' + loading() + '</div></div>';
     wireHeader();
-    Promise.all([loadTeam(u.branch), api({ action: 'logs', branch: u.branch, type: 'score', limit: 300 }).catch(function () { return { logs: [] }; })])
+    Promise.all([loadTeam(code), api({ action: 'logs', branch: code, type: 'score', limit: 300 }).catch(function () { return { logs: [] }; })])
       .then(function (r) { st.team = r[0]; st.hist = r[1].logs || []; draw(); })
       .catch(function (e) { $('#body').innerHTML = '<div class="alert">โหลดรายชื่อไม่ได้: ' + esc(e.message) + '</div>'; });
 
@@ -696,8 +704,8 @@
         st.saving = true; draw();
         var answers = {}, failed = [];
         items.forEach(function (t, i) { answers[i] = st.marks[i]; if (st.marks[i] === 'fail') failed.push(t); });
-        saveLog({ type: 'score', staffId: who.id, staffName: who.name, staffPosition: who.position, topic: st.topic, score: p, maxScore: items.length, pct: pct, failedItems: failed, note: st.note, answers: answers })
-          .then(function () { toast('บันทึกผลของ ' + firstName(who.name) + ' แล้ว'); go('#/'); })
+        saveLog({ type: 'score', branch: code, staffId: who.id, staffName: who.name, staffPosition: who.position, topic: st.topic, score: p, maxScore: items.length, pct: pct, failedItems: failed, note: st.note, answers: answers })
+          .then(function () { toast('บันทึกผลของ ' + firstName(who.name) + ' แล้ว'); go(isAm ? '#/history/' + code : st.topic ? '#/bm/history' : '#/'); })
           .catch(function (e) { st.saving = false; draw(); toast('บันทึกไม่สำเร็จ: ' + e.message); });
       };
     }
@@ -838,9 +846,9 @@
 
   /* ---------------- BM · Role-play ---------------- */
   function viewBmRoleplay() {
-    var u = user(), all = C.roleplay || [], DEVS = ['ทั้งหมด'].concat(C.roleplayDevices || []), TOTAL = 300;
+    var u = user(), isAm = u.role === 'ASM', all = C.roleplay || [], DEVS = ['ทั้งหมด'].concat(C.roleplayDevices || []), TOTAL = 600;
     var pref = store('mp_rp_dev');
-    var st = { dev: DEVS.indexOf(pref) >= 0 ? pref : 'ทั้งหมด', c: null, left: TOTAL, running: false, team: null, staffId: '', deck: null };
+    var st = { dev: DEVS.indexOf(pref) >= 0 ? pref : 'ทั้งหมด', c: null, left: TOTAL, running: false, team: null, staffId: '', deck: null, branch: isAm ? (store('mp_am_branch') || '') : u.branch };
     var timer = null;
     function stop() { if (timer) { clearInterval(timer); timers = timers.filter(function (t) { return t !== timer; }); timer = null; } st.running = false; }
     // สำรับโจทย์: สุ่มลำดับแล้ววนจนครบทุกข้อก่อนเริ่มรอบใหม่ (จำไว้ในเครื่อง)
@@ -858,14 +866,21 @@
       d.pos++; store(key, d);
     }
     nextCase();
-    app.innerHTML = '<div class="wrap">' + header('สาขา ' + u.branch + ' · BM เล่นเป็นลูกค้า', 'Role-play', true) + '<div id="body">' + loading() + '</div></div>';
+    app.innerHTML = '<div class="wrap">' + header(isAm ? 'ASM · เช็กพนักงานหน้าร้าน' : 'สาขา ' + u.branch + ' · BM เล่นเป็นลูกค้า', 'Role-play', true) + '<div id="body">' + loading() + '</div></div>';
     wireHeader();
-    loadTeam(u.branch).then(function (t) { st.team = t; draw(); }).catch(function () { st.team = []; draw(); });
+    function loadT() {
+      st.team = null; st.staffId = '';
+      if (!st.branch) { st.team = []; draw(); return; }
+      var code = st.branch;
+      loadTeam(code).then(function (t) { if (code === st.branch) { st.team = t; draw(); } }).catch(function () { st.team = []; draw(); });
+    }
+    loadT();
 
     function draw() {
       var c = st.c, mm = Math.floor(st.left / 60), ss = String(st.left % 60).padStart(2, '0');
-      var html =
-        '<div class="field"><label for="emp">พนักงานที่ฝึก</label>' + staffSelect('emp', st.team, st.staffId) + '</div>' +
+      var html = (isAm ? '<div class="field"><label for="br">สาขา</label><select id="br" class="input"><option value="">— เลือกสาขา —</option>' +
+          BRANCHES.map(function (x) { return '<option value="' + x.code + '"' + (x.code === st.branch ? ' selected' : '') + '>ID' + x.code + ' : ' + esc(x.name) + '</option>'; }).join('') + '</select></div><div style="height:10px"></div>' : '') +
+        '<div class="field"><label for="emp">พนักงานที่ฝึก</label>' + (st.team ? staffSelect('emp', st.team, st.staffId, null, !st.branch ? '— เลือกสาขาก่อน —' : null) : '<select id="emp" class="input" disabled><option>กำลังโหลด…</option></select>') + '</div>' +
         '<div class="label-strong" style="margin:12px 0 6px">อุปกรณ์</div>' +
         '<div class="seg">' + DEVS.map(function (d) { var n = d === 'ทั้งหมด' ? all.length : all.filter(function (x) { return x.dev === d; }).length; return '<button class="choice' + (d === st.dev ? ' on' : '') + '" data-dev="' + esc(d) + '" aria-pressed="' + (d === st.dev) + '">' + esc(d) + ' <span class="tiny" style="opacity:.7">' + n + '</span></button>'; }).join('') + '</div>' +
         '<div class="card dark" style="margin-top:12px"><div class="row between" style="flex-wrap:wrap;gap:6px"><span class="row" style="gap:6px"><span class="chip" style="background:#1E5BD8;color:#fff">' + esc(c.dev) + '</span><span class="chip" style="background:#262A33;color:#B9BFCA">' + esc(c.type) + '</span></span>' +
@@ -890,6 +905,7 @@
       $('#body').innerHTML = html;
       if (open) app.querySelector('details').open = true;
       $('#emp').onchange = function (e) { st.staffId = e.target.value; draw(); };
+      var brs = $('#br'); if (brs) brs.onchange = function (e) { st.branch = e.target.value; store('mp_am_branch', st.branch); loadT(); draw(); };
       app.querySelectorAll('[data-dev]').forEach(function (el) {
         el.onclick = function () { stop(); st.left = TOTAL; st.dev = el.getAttribute('data-dev'); store('mp_rp_dev', st.dev); nextCase(); draw(); };
       });
@@ -904,7 +920,8 @@
       $('#next').onclick = function () { stop(); st.left = TOTAL; nextCase(); draw(); window.scrollTo(0, 0); };
       $('#score').onclick = function () {
         if (!st.staffId) return;
-        stop(); store('mp_rp', { staffId: st.staffId, who: c.dev + ' · ' + c.who }); go('#/bm/score/' + st.staffId);
+        stop(); store('mp_rp', { staffId: st.staffId, who: c.dev + ' · ' + c.type + ' · ' + c.who });
+        go(isAm ? '#/am/score/' + st.branch + '/' + st.staffId : '#/bm/score/' + st.staffId);
       };
     }
   }
@@ -1076,7 +1093,7 @@
 
   function computeAuto(period, team, logs, audits) {
     var inP = function (d) { return monthKey(d) === period; };
-    var scored = {}; logs.forEach(function (l) { if (l.type === 'score' && inP(l.saved_at)) scored[l.staff_id] = 1; });
+    var scored = {}; logs.forEach(function (l) { if (l.type === 'score' && l.bm_name !== 'ASM' && inP(l.saved_at)) scored[l.staff_id] = 1; });
     var pia = team.filter(function (m) { return m.position === 'PIA'; });
     var mx = demoMatrix(logs, pia);
     var full = pia.filter(function (m) { return mx[m.id].filter(Boolean).length === C.demoDevices.length; }).length;
@@ -1426,6 +1443,120 @@
     }).join('') + '</div></div>';
   }
 
+
+
+  /* ---------------- ประวัติการฝึกทีม (BM ดูสาขาตัวเอง · ASM ดูได้ทุกสาขา) ---------------- */
+  function rpInfo(l) {
+    var t = String(l.topic || '');
+    if (!/^Role-play/.test(t)) return null;
+    var p = t.split(' · '), devs = C.roleplayDevices || [];
+    if (devs.indexOf(p[1]) >= 0) return { dev: p[1], type: p.length > 3 ? p[2] : '', who: p.length > 3 ? p.slice(3).join(' · ') : p.slice(2).join(' · ') };
+    return { dev: '', type: '', who: p.slice(1).join(' · ') };
+  }
+  function shortDate(d) { return fmtDate(d).split(' ').slice(0, 2).join(' '); }
+
+  function viewHistory(code) {
+    var u = user(), isAm = u.role === 'ASM';
+    var st = { code: code || store('mp_am_branch') || '', month: 'all', open: '', team: null, logs: null, err: '' };
+    var DEVS = C.roleplayDevices || [];
+    app.innerHTML = '<div class="wrap">' + header(isAm ? 'ASM · รายงานรายสาขา' : 'สาขา ' + u.branch, 'ประวัติการฝึกทีม', true) + '<div id="body">' + loading() + '</div></div>';
+    wireHeader();
+    function load() {
+      st.team = null; st.logs = null; st.err = '';
+      if (!st.code) { draw(); return; }
+      var c = st.code;
+      Promise.all([loadTeam(c), api({ action: 'logs', branch: c, limit: 3000 })]).then(function (r) {
+        if (c !== st.code) return;
+        st.team = r[0]; st.logs = (r[1].logs || []).filter(function (l) { return l.type === 'score' || l.type === 'demo'; }); draw();
+      }).catch(function (e) { st.err = e.message; draw(); });
+      draw();
+    }
+    function draw() {
+      var html = '';
+      if (isAm) html += '<div class="field"><label for="br">สาขา</label><select id="br" class="input"><option value="">— เลือกสาขา —</option>' +
+        BRANCHES.map(function (x) { return '<option value="' + x.code + '"' + (x.code === st.code ? ' selected' : '') + '>ID' + x.code + ' : ' + esc(x.name) + '</option>'; }).join('') + '</select></div>';
+      if (!st.code) { $('#body').innerHTML = html + '<p class="small muted" style="margin:12px 4px">เลือกสาขาเพื่อดูประวัติ</p>'; wire(); return; }
+      if (st.err) { $('#body').innerHTML = html + '<div class="alert" style="margin-top:12px">โหลดข้อมูลไม่ได้: ' + esc(st.err) + '</div>'; wire(); return; }
+      if (!st.logs) { $('#body').innerHTML = html + loading(); wire(); return; }
+
+      var months = {}; st.logs.forEach(function (l) { months[monthKey(l.saved_at)] = 1; }); months[monthKey(new Date())] = 1;
+      var mlist = Object.keys(months).filter(Boolean).sort().reverse();
+      var logs = st.logs.filter(function (l) { return st.month === 'all' || monthKey(l.saved_at) === st.month; });
+      var scores = logs.filter(function (l) { return l.type === 'score'; });
+      var rps = scores.filter(function (l) { return rpInfo(l); });
+      var trained = {}; scores.forEach(function (l) { trained[l.staff_id] = 1; });
+      var avg = avgOf(scores.map(function (l) { return l.pct; }));
+      // ข้อที่ทีมพลาดบ่อย
+      var miss = {}; scores.forEach(function (l) { String(l.failed_items || '').split(' | ').filter(Boolean).forEach(function (f) { miss[f] = (miss[f] || 0) + 1; }); });
+      var tops = Object.keys(miss).map(function (k) { return { t: k, n: miss[k] }; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 5);
+      // ตารางคน × อุปกรณ์
+      var byStaff = {};
+      st.team.forEach(function (m) { byStaff[m.id] = { m: m, dev: {}, real: [], demo: {}, all: [] }; });
+      logs.forEach(function (l) {
+        var x = byStaff[l.staff_id];
+        if (!x) { x = byStaff[l.staff_id] = { m: { id: l.staff_id, name: l.staff_name + ' (ไม่อยู่ในสาขาแล้ว)', position: l.staff_position }, dev: {}, real: [], demo: {}, all: [], gone: true }; }
+        x.all.push(l);
+        if (l.type === 'demo') { if (Number(l.pct) === 100) x.demo[l.topic] = 1; return; }
+        var r = rpInfo(l);
+        if (r && r.dev) { (x.dev[r.dev] = x.dev[r.dev] || []).push(l); }
+        else if (!r) x.real.push(l);
+        else (x.dev['อื่นๆ'] = x.dev['อื่นๆ'] || []).push(l);
+      });
+      var rows = Object.keys(byStaff).map(function (k) { return byStaff[k]; }).filter(function (x) { return !x.gone || x.all.length; });
+      rows.sort(function (a, b) { return a.all.length - b.all.length; });
+      var neverN = rows.filter(function (x) { return !x.all.some(function (l) { return l.type === 'score'; }); }).length;
+
+      html += '<div class="field" style="margin-top:' + (isAm ? '10px' : '0') + '"><label for="m">ช่วงเวลา</label><select id="m" class="input"><option value="all"' + (st.month === 'all' ? ' selected' : '') + '>ทั้งหมด</option>' +
+        mlist.map(function (k) { return '<option value="' + k + '"' + (k === st.month ? ' selected' : '') + '>' + esc(monthLabel(k)) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="grid3" style="margin-top:12px">' +
+        '<div class="card dark stat"><div class="label">ฝึกแล้ว</div><div class="value">' + Object.keys(trained).filter(function (id) { return byStaff[id] && !byStaff[id].gone; }).length + '/' + st.team.length + '</div><div class="tiny muted">คน</div></div>' +
+        '<div class="card stat"><div class="label">Role-play</div><div class="value">' + rps.length + '</div><div class="tiny muted">ครั้ง · ขายจริง ' + (scores.length - rps.length) + '</div></div>' +
+        '<div class="card stat"><div class="label">คะแนนเฉลี่ย</div><div class="value ' + pctColor(avg) + '">' + pctTxt(avg) + '</div><div class="tiny muted">' + (neverN ? '<span class="bad">ยังไม่เคยฝึก ' + neverN + ' คน</span>' : 'ฝึกครบทุกคน') + '</div></div></div>' +
+
+        '<div class="row between" style="margin:18px 4px 8px"><h2 class="h2">รายคน × อุปกรณ์</h2><span class="small muted">แตะชื่อเพื่อดูประวัติ</span></div>' +
+        '<div class="card" style="padding:0;overflow-x:auto"><table class="tbl hist"><thead><tr><th>พนักงาน</th>' + DEVS.map(function (d) { return '<th class="num">' + esc(d === 'Apple Watch' ? 'Watch' : d) + '</th>'; }).join('') + '<th class="num">ขายจริง</th><th class="num">Demo</th></tr></thead><tbody>' +
+        rows.map(function (x) {
+          var cells = DEVS.map(function (d) {
+            var a = x.dev[d]; if (!a) return '<td class="num"><span class="none">–</span></td>';
+            var last = a[0]; return '<td class="num"><b class="' + pctColor(last.pct) + '">' + last.pct + '%</b>' + (a.length > 1 ? '<span class="tiny muted"> ×' + a.length + '</span>' : '') + '</td>';
+          }).join('');
+          var real = x.real[0];
+          var nd = Object.keys(x.demo).length, isPia = x.m.position === 'PIA';
+          var openRow = st.open === x.m.id;
+          var tr = '<tr data-open="' + esc(x.m.id) + '" class="' + (openRow ? 'on' : '') + '" style="cursor:pointer"><td><b>' + esc(firstName(x.m.name)) + '</b> <span class="tiny muted">' + esc(x.m.position || '') + '</span>' + (!x.all.length ? '<div class="tiny bad">ยังไม่เคยฝึก</div>' : '') + '</td>' + cells +
+            '<td class="num">' + (real ? '<b class="' + pctColor(real.pct) + '">' + real.pct + '%</b>' + (x.real.length > 1 ? '<span class="tiny muted"> ×' + x.real.length + '</span>' : '') : '<span class="none">–</span>') + '</td>' +
+            '<td class="num">' + (isPia ? nd + '/4' : '<span class="tiny muted">–</span>') + '</td></tr>';
+          if (openRow) {
+            tr += '<tr class="detail"><td colspan="' + (DEVS.length + 3) + '">' + (x.all.length ? x.all.map(function (l) {
+              var r = rpInfo(l), title, by = l.bm_name === 'ASM' ? 'ASM' : 'BM';
+              if (l.type === 'demo') title = 'Demo Product · ' + esc(l.topic);
+              else if (r) title = 'Role-play' + (r.dev ? ' · ' + esc(r.dev) : '') + (r.type ? ' · ' + esc(r.type) : '') + '<div class="tiny muted">ลูกค้า: ' + esc(r.who) + '</div>';
+              else title = 'ประเมินจากการขายจริง';
+              var fails = String(l.failed_items || '').split(' | ').filter(Boolean);
+              return '<div class="hrow"><div class="row between" style="align-items:flex-start;gap:10px"><div style="flex:1;min-width:0"><b class="small">' + title + '</b></div>' +
+                '<div style="text-align:right;flex:none"><b class="' + pctColor(l.pct) + '">' + (l.type === 'demo' ? l.score + '/' + l.max_score : l.pct + '%') + '</b><div class="tiny muted">' + shortDate(l.saved_at) + ' · โดย ' + by + '</div></div></div>' +
+                (fails.length ? '<div class="tiny bad" style="margin-top:4px">ต้องฝึกต่อ: ' + fails.map(esc).join(' · ') + '</div>' : '') +
+                (l.note ? '<div class="tiny muted" style="margin-top:2px">โน้ต: ' + esc(l.note) + '</div>' : '') + '</div>';
+            }).join('') : '<p class="small muted" style="margin:4px 0">ยังไม่มีบันทึกการฝึกในช่วงนี้</p>') +
+              ('<div class="row" style="gap:8px;margin-top:8px"><a class="btn ghost small" href="' + (isAm ? '#/am/roleplay' : '#/bm/roleplay') + '">Role-play</a>' + (isAm ? '' : '<a class="btn ghost small" href="#/bm/score/' + esc(x.m.id) + '">ประเมินจากการขายจริง</a>') + '</div>') + '</td></tr>';
+          }
+          return tr;
+        }).join('') + '</tbody></table></div>' +
+        '<p class="tiny muted" style="margin:8px 4px 0">ตัวเลข = คะแนนครั้งล่าสุด · ×2 = ฝึกแล้ว 2 ครั้ง · – = ยังไม่เคยฝึก · Demo = อุปกรณ์ที่ผ่านครบ 4 ขั้น (เฉพาะ PIA)</p>' +
+
+        '<div class="card" style="margin-top:14px"><h2 class="h2">หัวข้อที่ทีมยังพลาดบ่อย</h2>' + (tops.length ? tops.map(function (t) {
+          return '<div class="row between" style="padding:8px 0;border-top:1px solid #ECEEF1"><span class="small" style="flex:1">' + esc(t.t) + '</span><b class="small bad">' + t.n + ' ครั้ง</b></div>';
+        }).join('') : '<p class="small muted" style="margin:8px 0 0">ยังไม่มีข้อมูล</p>') + '</div>';
+      $('#body').innerHTML = html;
+      wire();
+    }
+    function wire() {
+      var b = $('#br'); if (b) b.onchange = function (e) { st.code = e.target.value; store('mp_am_branch', st.code); st.open = ''; load(); };
+      var m = $('#m'); if (m) m.onchange = function (e) { st.month = e.target.value; draw(); };
+      app.querySelectorAll('[data-open]').forEach(function (el) { el.onclick = function () { var id = el.getAttribute('data-open'); st.open = st.open === id ? '' : id; var y = window.scrollY; draw(); window.scrollTo(0, y); }; });
+    }
+    load();
+  }
 
   render();
 })();

@@ -220,3 +220,13 @@ a.card.stat { color: var(--text); display: block; margin: 0; }
 .thumb .del { position: absolute; top: 4px; right: 4px; width: 32px; height: 32px; border-radius: 16px; border: 0; background: rgba(22,24,29,.75); color: #fff; font-size: 20px; line-height: 1; cursor: pointer; }
 .item .thumbs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (min-width: 700px) { .thumbs { grid-template-columns: repeat(5, minmax(0, 1fr)); } .thumbs.view { grid-template-columns: repeat(4, minmax(0, 1fr)); } .item .thumbs { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+
+/* v3.3 · training history */
+.tbl.hist td, .tbl.hist th { padding: 10px 8px; }
+.tbl.hist tr.on td { background: var(--blue-soft); }
+.tbl.hist tr.detail td { background: #FAFBFC; padding: 8px 12px 12px; }
+.tbl .none { color: var(--orange-strong); opacity: .55; font-weight: 700; }
+.hrow { padding: 8px 0; border-top: 1px solid #ECEEF1; }
+.hrow:first-child { border-top: 0; }
+details > summary { list-style: none; } details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: '▸ '; } details[open] > summary::before { content: '▾ '; }
