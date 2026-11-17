@@ -120,7 +120,6 @@
     if (parts[0] === 'bmeval' && u.role === 'ASM') return viewBmEvalList();
     if (parts[0] === 'bm' && u.role !== 'ASM') {
       if (parts[1] === 'score') return viewBmScore(parts[2]);
-      if (parts[1] === 'spot') return viewBmSpot();
       if (parts[1] === 'demo') return viewBmDemo();
       if (parts[1] === 'roleplay') return viewBmRoleplay();
       if (parts[1] === 'objection' || parts[1] === 'democards') return viewCards(parts[1]);
@@ -566,17 +565,18 @@
         }).join('') + '</tbody></table></div>' +
 
         '<div class="row between" style="margin:18px 4px 8px"><h2 class="h2">กิจกรรมโค้ชของ BM</h2><span class="small muted">' + esc(monthLabel(st.month)) + '</span></div>' +
-        '<div class="card" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr><th>สาขา</th><th>ประเมินพนักงาน</th><th>เฉลี่ย</th><th>Spot-check</th><th>Demo ผ่าน</th></tr></thead><tbody>' +
+        '<div class="card" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr><th>สาขา</th><th>ประเมินพนักงาน</th><th>เฉลี่ย</th><th>Role-play</th><th>Demo ผ่าน</th></tr></thead><tbody>' +
         BRANCHES.map(function (b) {
-          var a = act[b.code], sAvg = avgOf(a.score.map(function (l) { return l.pct; })), spotP = a.spotN ? Math.round(a.spotOk / a.spotN * 100) : null;
+          var a = act[b.code], sAvg = avgOf(a.score.map(function (l) { return l.pct; }));
           var people = {}; a.score.forEach(function (l) { people[l.staff_id] = 1; });
-          var none = !a.score.length && !a.spotBills && !a.demo;
+          var none = !a.score.length && !a.demo;
+          var rp = a.score.filter(function (l) { return /^Role-play/.test(l.topic || ''); }).length;
           return '<tr><td><a href="#/branch/' + b.code + '"><b>' + b.code + '</b> <span class="muted">' + esc(b.name.replace(/^Studio ?7-?/, '')) + '</span></a></td>' +
             (none ? '<td colspan="4" class="small bad">ยังไม่มีบันทึก</td>' :
               '<td class="num">' + Object.keys(people).length + ' คน</td><td class="num ' + pctColor(sAvg) + '">' + pctTxt(sAvg) + '</td>' +
-              '<td class="num">' + a.spotBills + ' บิล' + (spotP == null ? '' : ' · <span class="' + pctColor(spotP) + '">' + spotP + '%</span>') + '</td><td class="num">' + a.demo + '</td>') + '</tr>';
+              '<td class="num">' + rp + ' ครั้ง</td><td class="num">' + a.demo + '</td>') + '</tr>';
         }).join('') + '</tbody></table></div>' +
-        '<p class="tiny muted" style="margin:8px 4px 0">Demo ผ่าน = จำนวนครั้งที่ PIA Demo ผ่านครบ 4 ขั้น · Spot-check % = ข้อที่ทำ ÷ ข้อที่ตรวจ</p>';
+        '<p class="tiny muted" style="margin:8px 4px 0">Demo ผ่าน = จำนวนครั้งที่ PIA Demo ผ่านครบ 4 ขั้น · Role-play = ครั้งที่ BM ให้คะแนนหลัง Role-play</p>';
       $('#body').innerHTML = html;
       $('#m').onchange = function (e) { st.month = e.target.value; draw(); };
     }
@@ -587,12 +587,11 @@
     api({ action: 'logs', branch: code, limit: 300 }).then(function (j) {
       var mk = monthKey(new Date());
       var logs = (j.logs || []).filter(function (l) { return monthKey(l.saved_at) === mk; });
-      var sc = logs.filter(function (l) { return l.type === 'score'; }), sp = logs.filter(function (l) { return l.type === 'spot'; }), dm = logs.filter(function (l) { return l.type === 'demo'; });
-      var spOk = sp.reduce(function (a, l) { return a + (Number(l.score) || 0); }, 0), spN = sp.reduce(function (a, l) { return a + (Number(l.max_score) || 0); }, 0);
+      var sc = logs.filter(function (l) { return l.type === 'score'; }), dm = logs.filter(function (l) { return l.type === 'demo'; });
       el.innerHTML = '<div class="card"><div class="row between"><h2 class="h2">กิจกรรมโค้ชของ BM เดือนนี้</h2></div>' +
         '<div class="grid3" style="margin-top:10px">' +
         '<div class="stat"><div class="label">ประเมินพนักงาน</div><div class="value" style="font-size:20px">' + sc.length + ' <span class="small muted">ครั้ง · ' + pctTxt(avgOf(sc.map(function (l) { return l.pct; }))) + '</span></div></div>' +
-        '<div class="stat"><div class="label">Spot-check</div><div class="value" style="font-size:20px">' + sp.length + ' <span class="small muted">บิล · ' + (spN ? Math.round(spOk / spN * 100) + '%' : '–') + '</span></div></div>' +
+        '<div class="stat"><div class="label">Role-play</div><div class="value" style="font-size:20px">' + sc.filter(function (l) { return /^Role-play/.test(l.topic || ''); }).length + ' <span class="small muted">ครั้ง</span></div></div>' +
         '<div class="stat"><div class="label">Demo Product</div><div class="value" style="font-size:20px">' + dm.filter(function (l) { return Number(l.pct) === 100; }).length + ' <span class="small muted">ผ่าน</span></div></div></div>' +
         (logs.length ? '<div class="list" style="margin-top:10px;border:1px solid #ECEEF1">' + logs.slice(0, 6).map(logRow).join('') + '</div>' : '<p class="small bad" style="margin:10px 0 0">BM ยังไม่มีบันทึกเดือนนี้</p>') + '</div>';
     }).catch(function () { el.innerHTML = ''; });
@@ -608,9 +607,8 @@
   /* ---------------- BM · หน้าแรก ---------------- */
   var BM_TOOLS = [
     ['score', 'ประเมินพนักงาน', '10 ข้อ · หลังสังเกตการขายจริง'],
-    ['spot', 'Spot-check หน้าร้าน', '5 ข้อต่อบิล · ทำ / ไม่ได้ทำ'],
     ['demo', 'Demo Product', 'เฉพาะ PIA · Mac iPad Pencil Watch'],
-    ['roleplay', 'Role-play', 'สุ่มลูกค้า · จับเวลา 5 นาที'],
+    ['roleplay', 'Role-play', 'สุ่มโจทย์ตามอุปกรณ์ · จับเวลา 5 นาที'],
     ['objection', 'การ์ดข้อโต้แย้ง', 'ฝึกตอบใน 1 ประโยค'],
     ['democards', 'การ์ดคำถาม Demo', 'คำถามลูกค้าระหว่าง Demo']
   ];
@@ -642,16 +640,13 @@
       var team = r[0], logs = r[1].logs || [], mk = monthKey(new Date());
       var month = logs.filter(function (l) { return monthKey(l.saved_at) === mk; });
       var scored = {}; month.filter(function (l) { return l.type === 'score'; }).forEach(function (l) { if (!scored[l.staff_id]) scored[l.staff_id] = l; });
-      var sp = month.filter(function (l) { return l.type === 'spot'; });
-      var spOk = sp.reduce(function (a, l) { return a + (Number(l.score) || 0); }, 0), spN = sp.reduce(function (a, l) { return a + (Number(l.max_score) || 0); }, 0);
       var pia = team.filter(function (m) { return m.position === 'PIA'; });
       var dm = demoMatrix(logs, pia);
       var full = pia.filter(function (m) { return dm[m.id].filter(Boolean).length === C.demoDevices.length; }).length;
       var notYet = team.filter(function (m) { return !scored[m.id]; });
       $('#team').innerHTML =
-        '<div class="grid3">' +
-        '<a class="card stat" href="#/bm/score"><div class="label">ประเมินพนักงาน</div><div class="value">' + Object.keys(scored).length + '/' + team.length + '</div></a>' +
-        '<a class="card stat" href="#/bm/spot"><div class="label">Spot-check</div><div class="value ' + pctColor(spN ? Math.round(spOk / spN * 100) : null) + '">' + (spN ? Math.round(spOk / spN * 100) + '%' : '–') + '</div><div class="tiny muted">' + sp.length + ' บิล</div></a>' +
+        '<div class="grid2">' +
+        '<a class="card stat" href="#/bm/score"><div class="label">ประเมินพนักงาน</div><div class="value">' + Object.keys(scored).length + '/' + team.length + '</div><div class="tiny muted">คน</div></a>' +
         '<a class="card stat" href="#/bm/demo"><div class="label">Demo ผ่านครบ 4</div><div class="value">' + full + '/' + pia.length + '</div><div class="tiny muted">PIA</div></a></div>' +
         (notYet.length ? '<div class="card" style="margin-top:12px"><b class="small">ยังไม่ได้ประเมินเดือนนี้ (' + notYet.length + ' คน)</b><div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">' +
           notYet.map(function (m) { return '<a class="chip orange" href="#/bm/score/' + esc(m.id) + '">' + esc(firstName(m.name)) + ' · ' + esc(m.position) + '</a>'; }).join('') + '</div></div>' : '') +
@@ -843,19 +838,39 @@
 
   /* ---------------- BM · Role-play ---------------- */
   function viewBmRoleplay() {
-    var u = user(), cases = C.roleplay || [], TOTAL = 300;
-    var st = { idx: Math.floor(Math.random() * cases.length), left: TOTAL, running: false, team: null, staffId: '' };
+    var u = user(), all = C.roleplay || [], DEVS = ['ทั้งหมด'].concat(C.roleplayDevices || []), TOTAL = 300;
+    var pref = store('mp_rp_dev');
+    var st = { dev: DEVS.indexOf(pref) >= 0 ? pref : 'ทั้งหมด', c: null, left: TOTAL, running: false, team: null, staffId: '', deck: null };
     var timer = null;
     function stop() { if (timer) { clearInterval(timer); timers = timers.filter(function (t) { return t !== timer; }); timer = null; } st.running = false; }
+    // สำรับโจทย์: สุ่มลำดับแล้ววนจนครบทุกข้อก่อนเริ่มรอบใหม่ (จำไว้ในเครื่อง)
+    function pool() { return all.map(function (c, i) { return i; }).filter(function (i) { return st.dev === 'ทั้งหมด' || all[i].dev === st.dev; }); }
+    function shuffle(arr) { for (var i = arr.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = arr[i]; arr[i] = arr[j]; arr[j] = t; } return arr; }
+    function nextCase() {
+      var key = 'mp_rp_deck_' + st.dev, d = store(key), p = pool();
+      if (!d || !d.order || d.pos >= d.order.length || d.order.some(function (i) { return p.indexOf(i) < 0; }) || d.order.length !== p.length) {
+        var last = d && d.order ? d.order[d.order.length - 1] : -1;
+        var order = shuffle(p.slice());
+        if (order.length > 1 && order[0] === last) { order.push(order.shift()); }
+        d = { order: order, pos: 0, round: (d && d.round || 0) + 1 };
+      }
+      st.c = all[d.order[d.pos]]; st.deck = { pos: d.pos + 1, n: d.order.length, round: d.round };
+      d.pos++; store(key, d);
+    }
+    nextCase();
     app.innerHTML = '<div class="wrap">' + header('สาขา ' + u.branch + ' · BM เล่นเป็นลูกค้า', 'Role-play', true) + '<div id="body">' + loading() + '</div></div>';
     wireHeader();
     loadTeam(u.branch).then(function (t) { st.team = t; draw(); }).catch(function () { st.team = []; draw(); });
 
     function draw() {
-      var c = cases[st.idx], mm = Math.floor(st.left / 60), ss = String(st.left % 60).padStart(2, '0');
+      var c = st.c, mm = Math.floor(st.left / 60), ss = String(st.left % 60).padStart(2, '0');
       var html =
         '<div class="field"><label for="emp">พนักงานที่ฝึก</label>' + staffSelect('emp', st.team, st.staffId) + '</div>' +
-        '<div class="card dark" style="margin-top:12px"><div class="row between"><span class="small muted">ลูกค้าวันนี้คือ</span><span class="small muted">โจทย์ ' + (st.idx + 1) + '/' + cases.length + '</span></div>' +
+        '<div class="label-strong" style="margin:12px 0 6px">อุปกรณ์</div>' +
+        '<div class="seg">' + DEVS.map(function (d) { var n = d === 'ทั้งหมด' ? all.length : all.filter(function (x) { return x.dev === d; }).length; return '<button class="choice' + (d === st.dev ? ' on' : '') + '" data-dev="' + esc(d) + '" aria-pressed="' + (d === st.dev) + '">' + esc(d) + ' <span class="tiny" style="opacity:.7">' + n + '</span></button>'; }).join('') + '</div>' +
+        '<div class="card dark" style="margin-top:12px"><div class="row between" style="flex-wrap:wrap;gap:6px"><span class="row" style="gap:6px"><span class="chip" style="background:#1E5BD8;color:#fff">' + esc(c.dev) + '</span><span class="chip" style="background:#262A33;color:#B9BFCA">' + esc(c.type) + '</span></span>' +
+        '<span class="small muted">โจทย์ ' + st.deck.pos + '/' + st.deck.n + (st.deck.round > 1 ? ' · รอบ ' + st.deck.round : '') + '</span></div>' +
+        '<div class="small muted" style="margin-top:10px">ลูกค้าวันนี้คือ</div>' +
         '<div style="font-size:24px;font-weight:700;margin-top:2px">' + esc(c.who) + '</div>' +
         '<div class="grid-rp" style="margin-top:10px">' +
         '<div><div class="tiny" style="color:#8FB2FF;font-weight:700">WHICH · ใช้อะไรอยู่</div><div class="small">' + esc(c.which) + '</div></div>' +
@@ -863,15 +878,21 @@
         '<div><div class="tiny" style="color:#8FB2FF;font-weight:700">PAIN POINT</div><div class="small">' + esc(c.pain) + '</div></div>' +
         '<div><div class="tiny" style="color:#FF9B5C;font-weight:700">ข้อโต้แย้งที่จะเจอ</div><div class="small">“' + esc(c.objection) + '”</div></div></div>' +
         '<p class="tiny muted" style="margin:10px 0 0">ห้ามบอกข้อมูลในการ์ดถ้าพนักงานไม่ถาม</p></div>' +
+        '<details class="card" style="margin-top:12px"><summary class="small" style="font-weight:700;cursor:pointer">เฉลยสำหรับ BM · สิ่งที่พนักงานควรเสนอ</summary><p class="small" style="margin:8px 0 0">' + esc(c.offer) + '</p></details>' +
         '<div class="card" style="margin-top:12px;text-align:center"><div class="small muted">เวลาขาย</div>' +
         '<div id="clock" style="font-size:56px;font-weight:700;font-variant-numeric:tabular-nums;color:' + (st.left <= 30 ? '#B4400B' : '#16181D') + '">' + mm + ':' + ss + '</div>' +
         '<div class="bar" style="margin:4px 0 12px"><i style="width:' + Math.round(st.left / TOTAL * 100) + '%"></i></div>' +
         '<div class="grid2"><button class="btn" id="run">' + (st.running ? 'หยุดชั่วคราว' : st.left === 0 ? 'หมดเวลา' : 'เริ่มจับเวลา') + '</button><button class="btn ghost" id="reset">เริ่มใหม่</button></div></div>' +
-        '<div class="card" style="margin-top:12px"><b class="small">พนักงานต้องทำให้ครบ</b><ol class="small" style="margin:6px 0 0;padding-left:20px"><li>ถาม Who / Which / Use for / Pain point</li><li>แนะนำรุ่นตรงการใช้งาน</li><li>เสนอคู่ Cover+</li><li>เสนอ Ufund / Trade-in</li><li>ตอบข้อโต้แย้งและปิดการขาย</li></ol></div>' +
-        '<button class="btn ghost" id="next" style="margin-top:12px">สุ่มลูกค้าใหม่</button>';
+        '<div class="card" style="margin-top:12px"><b class="small">พนักงานต้องทำให้ครบ</b><ol class="small" style="margin:6px 0 0;padding-left:20px"><li>ถาม Who / Which / Use for / Pain point</li><li>แนะนำรุ่นตรงการใช้งาน</li><li>เสนอคู่ Cover+ / AppleCare+ และ ACC</li><li>เสนอ Ufund / Trade-in</li><li>ตอบข้อโต้แย้งและปิดการขาย</li></ol></div>' +
+        '<button class="btn ghost" id="next" style="margin-top:12px">โจทย์ถัดไป</button>';
       html += '</div><div class="bottombar"><div class="inner"><button class="btn dark" id="score"' + (st.staffId ? '' : ' disabled') + '>' + (st.staffId ? 'จบ · ให้คะแนน' : 'เลือกพนักงานก่อนให้คะแนน') + '</button></div></div>';
+      var det = app.querySelector('details'), open = det && det.open;
       $('#body').innerHTML = html;
+      if (open) app.querySelector('details').open = true;
       $('#emp').onchange = function (e) { st.staffId = e.target.value; draw(); };
+      app.querySelectorAll('[data-dev]').forEach(function (el) {
+        el.onclick = function () { stop(); st.left = TOTAL; st.dev = el.getAttribute('data-dev'); store('mp_rp_dev', st.dev); nextCase(); draw(); };
+      });
       $('#run').onclick = function () {
         if (st.running) { stop(); draw(); return; }
         if (st.left === 0) return;
@@ -880,10 +901,10 @@
         timers.push(timer); draw();
       };
       $('#reset').onclick = function () { stop(); st.left = TOTAL; draw(); };
-      $('#next').onclick = function () { stop(); st.left = TOTAL; st.idx = (st.idx + 1 + Math.floor(Math.random() * (cases.length - 1))) % cases.length; draw(); window.scrollTo(0, 0); };
+      $('#next').onclick = function () { stop(); st.left = TOTAL; nextCase(); draw(); window.scrollTo(0, 0); };
       $('#score').onclick = function () {
         if (!st.staffId) return;
-        stop(); store('mp_rp', { staffId: st.staffId, who: c.who }); go('#/bm/score/' + st.staffId);
+        stop(); store('mp_rp', { staffId: st.staffId, who: c.dev + ' · ' + c.who }); go('#/bm/score/' + st.staffId);
       };
     }
   }
@@ -1056,14 +1077,12 @@
   function computeAuto(period, team, logs, audits) {
     var inP = function (d) { return monthKey(d) === period; };
     var scored = {}; logs.forEach(function (l) { if (l.type === 'score' && inP(l.saved_at)) scored[l.staff_id] = 1; });
-    var spots = logs.filter(function (l) { return l.type === 'spot' && inP(l.saved_at); }).length;
     var pia = team.filter(function (m) { return m.position === 'PIA'; });
     var mx = demoMatrix(logs, pia);
     var full = pia.filter(function (m) { return mx[m.id].filter(Boolean).length === C.demoDevices.length; }).length;
     var a = audits[0];
     var raw = {
       scoreCover: { v: Object.keys(scored).length + '/' + team.length + ' คน', r: team.length ? Object.keys(scored).length / team.length : 0 },
-      spot: { v: spots + ' บิล', r: spots / 20 },
       demo: { v: full + '/' + pia.length + ' PIA', r: pia.length ? full / pia.length : 0 },
       audit: { v: a ? a.total_pct + '% · ' + fmtDate(a.saved_at).split(' ').slice(0, 3).join(' ') : 'ยังไม่มีผลประเมิน', r: a ? Number(a.total_pct) / 80 : 0 }
     };
@@ -1295,7 +1314,7 @@
       if (e.agreements) html += '<div class="card" style="margin-top:12px;border:2px solid var(--blue)"><h2 class="h2">ข้อตกลงครั้งนี้</h2><p style="margin:8px 0 0;white-space:pre-wrap">' + esc(e.agreements) + '</p></div>';
       if (e.case_question || e.bm_plan) html += '<div class="card" style="margin-top:12px"><h2 class="h2">โจทย์คิดวิเคราะห์</h2>' + (e.case_question ? '<p class="small" style="margin:8px 0 0"><span class="muted">โจทย์:</span> ' + esc(e.case_question) + '</p>' : '') + (e.bm_plan ? '<p class="small" style="margin:6px 0 0;white-space:pre-wrap"><span class="muted">แผนของ BM:</span> ' + esc(e.bm_plan) + '</p>' : '') + '</div>';
       if (sec.auto) html += '<div class="row between" style="margin:18px 4px 8px"><h2 class="h2">A · อัตโนมัติ</h2></div><div class="list">' + sec.auto.map(function (r) {
-        var d = (C.bmEvalAuto || []).filter(function (x) { return x.k === r.k; })[0] || { name: r.k };
+        var d = (C.bmEvalAuto || []).filter(function (x) { return x.k === r.k; })[0] || { name: { spot: 'Spot-check สม่ำเสมอ' }[r.k] || r.k };
         return '<div><span style="flex:1"><b class="small">' + esc(d.name) + '</b><span class="small muted" style="display:block">' + esc(r.v) + '</span></span><span class="score">' + r.pts + '<span class="small muted">/' + r.w + '</span></span></div>';
       }).join('') + '</div>';
       (C.bmEvalSections || []).forEach(function (s) {
