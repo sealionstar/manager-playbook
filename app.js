@@ -1204,7 +1204,7 @@
               var p = Math.round(s.pts / s.w * 100);
               return '<div class="row"><span class="small ellipsis" style="width:42%">' + esc(s.name) + '</span>' + bar(p, true) + '<span class="small" style="width:60px;text-align:right;font-weight:700">' + s.pts + '/' + s.w + '</span></div>';
             }).join('') + '</div><p class="tiny muted" style="margin:8px 0 0">เกรด A 90+ · B 80–89 · C 70–79 · D ต่ำกว่า 70</p></div>' +
-            '<div class="field" style="margin-top:14px"><label for="agree">ข้อตกลงครั้งนี้ (1–3 ข้อ)</label><textarea id="agree" class="input" placeholder="เช่น 1. Huddle ทุกเช้า 10 นาที แจ้งยอด ATT รายคน&#10;2. Spot-check 5 บิล/สัปดาห์">' + esc(st.agree) + '</textarea>' +
+            '<div class="field" style="margin-top:14px"><label for="agree">ข้อตกลงครั้งนี้ (1–3 ข้อ)</label><textarea id="agree" class="input" placeholder="เช่น 1. Morning Brief ทุกเช้า แชร์ทริคการขายหรือทบทวนความรู้สินค้าวันละ 1 เรื่อง&#10;2. Role-play กับพนักงานสัปดาห์ละ 2 คน">' + esc(st.agree) + '</textarea>' +
             '<span class="tiny muted">BM เห็นที่หน้าแรก · ครั้งหน้าระบบจะดึงมาให้เช็กในข้อ "ทำตามข้อตกลงครั้งก่อน" · เขียนด้วย Pencil ลงช่องนี้ได้เลย (Scribble)</span></div>' +
             '<div class="field" style="margin-top:12px"><label for="note">โน้ตเพิ่มเติม</label><textarea id="note" class="input" placeholder="จุดแข็ง สิ่งที่ต้องพัฒนา">' + esc(st.note) + '</textarea></div>' +
             '<div class="field" style="margin-top:12px"><label>รูปภาพ (ไม่บังคับ)</label>' + photoBlock(st.ph) + '<span class="tiny muted">เช่น รูปบอร์ดเป้า ตารางงาน หรือจุดที่ต้องแก้ · สูงสุด ' + MAX_PHOTOS + ' รูป</span></div>' +
