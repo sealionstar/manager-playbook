@@ -956,7 +956,7 @@
     function deck() { return isDemo && st.tab !== 'ทั้งหมด' ? all.filter(function (c) { return c.dev === st.tab; }) : all; }
     function shuffle() { var d = deck(); st.order = d.map(function (c, i) { return i; }); for (var i = st.order.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = st.order[i]; st.order[i] = st.order[j]; st.order[j] = t; } st.pos = 0; st.flipped = false; st.res = []; }
     shuffle();
-    app.innerHTML = '<div class="wrap">' + header('สาขา ' + u.branch + ' · ใช้ตอน Huddle เช้า', isDemo ? 'การ์ดคำถาม Demo' : 'การ์ดข้อโต้แย้ง', true) + '<div id="body"></div></div>';
+    app.innerHTML = '<div class="wrap">' + header('สาขา ' + u.branch + ' · ' + (isDemo ? 'ฝึกตอบคำถาม Demo' : 'ฝึกตอบข้อโต้แย้ง'), isDemo ? 'การ์ดคำถาม Demo' : 'การ์ดข้อโต้แย้ง', true) + '<div id="body"></div></div>';
     wireHeader();
     function draw() {
       var d = deck(), total = d.length, done = st.pos >= total, c = done ? null : d[st.order[st.pos]];
